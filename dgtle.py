@@ -3,20 +3,26 @@ import requests
 from bs4 import BeautifulSoup 
 
 header = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:81.0) Gecko/20100101 Firefox/81.0'}
-URL = 'https://www.dgtle.com/article-1588130-1.html' #The target webpage
+
+#The target webpage
+
+URL = 'https://www.dgtle.com/inst-1655874-1.html' 
+
 
 
 if 'inst' in URL:
     
-    print('Inst type found')
-    print('Downloading')
+    print('This webpage is Inst type')
     # inst author
     html = requests.get(URL)
     html.encoding = html.apparent_encoding
     soup = BeautifulSoup(html.text, 'lxml')
     name = soup.select('div.own-img > div:nth-child(2) > span:nth-child(1)')
+    title = soup.title.get_text()
     for n1 in name:
         dir_name = n1.get_text()
+        print('The Author is: ' + dir_name)
+        print('The webpage title is: ' + title)
 
     # inst image
     ori_url_a1 = soup.find_all('div', class_='bg-img')
@@ -28,16 +34,18 @@ if 'inst' in URL:
 
 elif 'article' in URL:
 
-    print('Article type found')
-    print('Downloading')
+    print('This webpage is Article type')
     # article author
     html = requests.get(URL)
     html.encoding = html.apparent_encoding
     soup = BeautifulSoup(html.text, 'lxml')
     name = soup.select('.author')
+    title = soup.title.get_text()
     for n2 in name:
         dir_name = n2.get_text()
-        
+        print('The Author is ' + dir_name)
+        print('The webpage title is: ' + title)
+    
     # article image
     ori_url_b1 = soup.select('.articles-comment-left > figure > img')
     downlist = []
@@ -52,8 +60,17 @@ else:
 if not os.path.exists(dir_name):
     os.mkdir(dir_name)
 
+    
 for url in downlist:
     file_name=url.split("/")[-1]
-    meizi=requests.get(url,headers=header)
-    with open(dir_name+'/'+file_name,'wb') as f:
-        f.write(meizi.content)
+    with open(dir_name+'/'+ file_name, 'wb') as handle:
+            response = requests.get(url,headers=header, stream=True)
+
+            if not response.ok:
+                print(response)
+
+            for block in response.iter_content(1024):
+                if not block:
+                    break
+
+                handle.write(block)
