@@ -1,45 +1,59 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+import os 
+import requests 
+from bs4 import BeautifulSoup 
 
-import requests
-from bs4 import BeautifulSoup
+header = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:81.0) Gecko/20100101 Firefox/81.0'}
+URL = 'https://www.dgtle.com/article-1588130-1.html' #The target webpage
 
-import os
-import urllib
-import re
 
-kv={"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36"}
-r=requests.get("https://www.dgtle.com/article-1578708-1.html",headers=kv)
-soup = BeautifulSoup(r.text, 'lxml')
+if 'inst' in URL:
+    
+    print('Inst type found')
+    print('Downloading')
+    # inst author
+    html = requests.get(URL)
+    html.encoding = html.apparent_encoding
+    soup = BeautifulSoup(html.text, 'lxml')
+    name = soup.select('div.own-img > div:nth-child(2) > span:nth-child(1)')
+    for n1 in name:
+        dir_name = n1.get_text()
 
-r.raise_for_status()
-r.encoding=r.apparent_encoding
+    # inst image
+    ori_url_a1 = soup.find_all('div', class_='bg-img')
+    downlist = []
+    for a1 in ori_url_a1:
+        ori_url_a2 = a1['data-src']
+        real_url_a = ori_url_a2.replace('_1800_500','')
+        downlist.append(real_url_a)
 
-dir_name=re.findall('<span class="author">(.*?)</span>',r.text)[-1]
+elif 'article' in URL:
 
-small_pic = soup.find('div', class_='articles-comment-left').find_all('img')
+    print('Article type found')
+    print('Downloading')
+    # article author
+    html = requests.get(URL)
+    html.encoding = html.apparent_encoding
+    soup = BeautifulSoup(html.text, 'lxml')
+    name = soup.select('.author')
+    for n2 in name:
+        dir_name = n2.get_text()
+        
+    # article image
+    ori_url_b1 = soup.select('.articles-comment-left > figure > img')
+    downlist = []
+    for b1 in ori_url_b1:
+        ori_url_b2 = b1['src']
+        real_url_b = ori_url_b2.replace('_1800_500','')
+        downlist.append(real_url_b)
 
-downlist = []
-for a in small_pic:
-    title = a.get_text()
-    href = a['src']
-    img_url = href
-
-    if 'article' in img_url:
-        img_name = img_url[:-14]
-        ori_img_url = img_name + '.jpeg'
-        downlist.append(ori_img_url)
-
-    else:
-        ori_img_url = img_url
-        downlist.append(ori_img_url)
-
+else:
+    print('There is no key words in URL, please add new code to fix it.')
 
 if not os.path.exists(dir_name):
     os.mkdir(dir_name)
 
 for url in downlist:
     file_name=url.split("/")[-1]
-    images=requests.get(url,headers=kv)
+    meizi=requests.get(url,headers=header)
     with open(dir_name+'/'+file_name,'wb') as f:
-        f.write(images.content)
+        f.write(meizi.content)
