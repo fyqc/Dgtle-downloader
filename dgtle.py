@@ -1,128 +1,73 @@
+import wget
 import os 
 import time
-import requests
-from bs4 import BeautifulSoup 
-
+import urllib.request
+import re
+from bs4 import BeautifulSoup
 
 header = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:81.0) Gecko/20100101 Firefox/81.0'}
 URL = input('Please enter the webpage address from www.dgtle:')
+# eg. URL shall looks like: "https://www.dgtle.com/inst-1659256-1.html" or "https://www.dgtle.com/article-1589178-1.html"
 
 print('The web that open: ' + URL)
 
-if 'inst' in URL:
+try:
     
-    print('This webpage is Inst type')
-    # inst author
-    html = requests.get(URL)
-    html.encoding = 'UTF-8'
-    soup = BeautifulSoup(html.text, 'lxml')
-    name = soup.select('div.own-img > div:nth-child(2) > span:nth-child(1)')
-    title = soup.title.get_text()
-    for n1 in name:
-        dir_name = n1.get_text()
-        print('The Author is: ' + dir_name)
-        print('The webpage title is: ' + title)
-
-    # inst image
-    ori_url_a1 = soup.find_all('div', class_='bg-img')
-    downlist = []
-    for a1 in ori_url_a1:
-        ori_url_a2 = a1['data-src']
-        real_url_a = ori_url_a2.replace('_1800_500','')
-        downlist.append(real_url_a)
-
-elif 'article' in URL:
-
-    print('This webpage is Article type')
-    # article author
-    html = requests.get(URL)
-    html.encoding = 'UTF-8'
-    soup = BeautifulSoup(html.text, 'lxml')
-    name = soup.select('.author')
-    title = soup.title.get_text()
-    for n2 in name:
-        dir_name = n2.get_text()
-        print('The Author is: ' + dir_name)
-        print('The webpage title is: ' + title)
+    content = urllib.request.urlopen(URL).read()
+    data = content.decode('utf-8')
+    soup = BeautifulSoup(data, 'lxml')
     
-    # article image
-    ori_url_b1 = soup.select('.articles-comment-left > figure > img')
-    ori_url_c1 = soup.find_all('div', class_='articles-comment-left')
-    downlist = []
-    for b1 in ori_url_b1:
-        ori_url_b2 = b1['src']
-        real_url_b = ori_url_b2.replace('_1800_500','')
-        downlist.append(real_url_b)
-    for c1 in ori_url_c1:
-        c2 = c1.find_all('img')
-        for n in range(0, len(c2)):
-            c3 = c2[n].get('src')
-            real_url_c = c3.replace('_1800_500','')
-            downlist.append(real_url_c)
-
-
-elif 'thread' in URL:
-
-    print('This webpage is Thread type')
-    # thread author
-    html = requests.get(URL)
-    html.encoding = 'UTF-8'
-    soup = BeautifulSoup(html.text, 'lxml')
-    name = soup.select('.author')
+    # Print Title of the page
     title = soup.title.get_text()
-    for n2 in name:
-        dir_name = n2.get_text()
-        print('The Author is ' + dir_name)
-        print('The webpage title is: ' + title)
-    
-    # thread image
-    ori_url_c1 = soup.find_all('div', class_='articles-comment-left')
+    print(title)
+
+    # Extract the hi resolution image url
+    re_img_url = r"(?<=img src=\").+?dgtle_img.+?(?=\")"
+    urls = re.findall(re_img_url, data)
+
     downlist = []
-    for c1 in ori_url_c1:
-        c2 = c1.find_all('img')
-        for n in range(0, len(c2)):
-            real_url_c = c2[n].get('src')
-            downlist.append(real_url_c)
+    for url in urls:
+        url_hi = url.replace('_1800_500','')
+        downlist.append(url_hi)
+        
+    if 'inst' in URL:
+        # inst author
+        name = soup.select('div.own-img > div:nth-child(2) > span:nth-child(1)')
+        title = soup.title.get_text()
+        for n1 in name:
+            dir_name = n1.get_text()
+    elif 'article' in URL:
+        # article author
+        name = soup.select('.author')
+        title = soup.title.get_text()
+        for n2 in name:
+            dir_name = n2.get_text()
+    else:
+        # Just in case a new format is shown
+        print('There is no key words in URL, please add new code to fix it.')
 
-else:
-    # Just in case a new format is shown
-    print('There is no key words in URL, please add new code to fix it.')
+except:
+    print("Links extracting failed..")
+    print("Wait for 5 seconds")
+    time.sleep(5)
+    print("Continue...")
+    continue
 
-#Remove the empty line in downlist
-while '' in downlist:
-    downlist.remove('')
-
-#Remove emoji from downlist
-for n in downlist:
-    if 'dgtle' not in n:
-        downlist.remove(n)
+print(dir_name)
 
 # Create the folder with the author's id
 if not os.path.exists(dir_name):
     os.mkdir(dir_name)
 
-# Download the file from the url list
 for url in downlist:
-    file_name=url.split("/")[-1]
+    file_name = url.split("/")[-1]
+    try:
+        wget.download(url, out=(dir_name+'/'+ file_name))
+    except:
+        print("\n Downloading Interrupted..")
+        print("Wait for 5 seconds")
+        time.sleep(5)
+        print("Continue...")
+        continue
 
-    with open(dir_name+'/'+ file_name, 'wb') as handle:
-            response = ''
-            while response == '':
-                try:
-                    response = requests.get(url, verify=False, headers=header, stream=True)
-                    if not response.ok:
-                        print(response)
-                    for block in response.iter_content(1024):
-                        if not block:
-                            break
-                        handle.write(block)
-                    break
-                except:
-                    print("Connection dropped..")
-                    print("Wait for 5 seconds")
-                    time.sleep(5)
-                    print("Continue...")
-                    continue
-
-print('Done, Wait for 2 seconds to start the next one.')
-time.sleep(2)
+print()
