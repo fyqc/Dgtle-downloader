@@ -89,7 +89,7 @@ Due to the poor connection, the image that was downloaded might be incomplete. W
 
 ### Why I do this.
 
-I used to enjoy the beautiful photos taken by various photographers all over the world (mainly from CHina), however, it is painful to save each of them.
+I used to enjoy the beautiful photos taken by various photographers all over the world (mainly from China), however, it is painful to save each of them.
 Trying to search if there is an existing program available, but with no luck.
 So I have to pick up the books and start from zero to build my wheels.
 
