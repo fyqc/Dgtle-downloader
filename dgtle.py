@@ -10,8 +10,8 @@ images will be downloaded as their original resolution and
 stored into each folder by author's id.
 '''
 
-# 2/25/2021 
-# 11：23 PM
+# 3/11/2021 
+# 6:59 PM
 
 # Set current py folder as working folder with os package.
 rootdir=os.curdir 
@@ -200,10 +200,8 @@ def dgtdownloading(filenumber, downlist, dir_name):
                 t4 = time.time()-t3
                 print(f' {t4:.2f} Seconds used.') 
             except:
-                print('Download failed, Retrying')
+                print('Retry downloading')
                 attempts += 1
-                if attempts == 5:
-                    break
     return filenumber
 
 def dgtdownloader(url, file_name, dir_name, header):
@@ -223,15 +221,11 @@ def dgtdownloader(url, file_name, dir_name, header):
                 f.write(chunk)
             f.close()
         print(file_name + " successfully downloaded.")
+        success = True
 
     else:
-        print("The image has risk of incomplete")
-        with open(total_path, 'wb') as f:
-            for chunk in response.iter_content(1024):
-                f.write(chunk)
-            f.close()
-        print(file_name + "successfully downloaded.")
-    success = True
+        print(file_name + "may downloaded incomplete.")
+
     return success
 
 def dgtplay(URL, header):
