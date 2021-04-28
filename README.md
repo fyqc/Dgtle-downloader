@@ -62,7 +62,10 @@ For example:
 
 ## Known issues
 ### Pay extra attention to the page's title.
-Currently, this code is semi-auto, and it is designed to work with any url that shows as following format:
+
+There is only two valuable pages that comes with pretty images, one named article, the other named intested.
+
+You can tell these two type of pages by looking at their urls that shows as following format:
 
 `https://www.dgtle.com/inst-1693301-1.html`
 
@@ -70,19 +73,33 @@ and
 
 `https://www.dgtle.com/article-1642352-1.html`
 
-Any other pages that contain a video or those post dates earlier than 2014, this code might not work properly.
+The reason that I do not let this downloader support other pages, is simply because all else pages has no high quality images that worth me to download.
 
 ### Download Failed, and Retrying...
-Certain posters will upload a super large file (more than 30MB), and since the server is located in Beijing, China, the connection quality is terrible for North American users.
+
+Well, as you may see from the code, I tried hard to make sure it keey trying and trying after a highly-possible disconnection happened.
+
+However, certain posters will upload a super large file (more than 30MB), and since the server is located in Beijing, China, the connection quality is terrible for North American users. 
+
+Nothing I could do with that.
 
 ### Image saved incomplete
-Due to the poor connection, the image that was downloaded might be incomplete. Which you might see a grey area at the lower section of that image.
 
-#### Temporary solution:
-* Retry the download one more time. 
-* Try it at a later time.
-* Delete this image if you are not pleased.
-* Go to the page and save it manually.
+Well, well, well.
+
+This issue has been fixed!
+
+Thanks to the COVID-19, I have plenty of time staying at home, to fix this issue in-side-out.
+
+This is caused by the poor connection.
+
+During transition, if connection flutter, program will consider it MIGHT finished downloading, but it wasn't.
+
+To fix that, I let the download module to check the 'Content-Length' as part of the response.header.
+
+Therefore, if the 'Content-Length' won't match, that means the Internet connection is not reliable. So step back, and try one more time, until we got the correct 'Content-Length'.
+
+This will garantee that the image will be downloaded as a whole piece, and the gray area will never come back again.
 
 
 ## About me
@@ -105,3 +122,37 @@ He nodded his head, and showed him two previous prototypes he had tried earlier.
 I'm still a beginner in programming, but I believe one day I will be better.
 
 Hope you enjoy the code.
+
+```python
+"""
+                                   el psy congroo
+                                (@&&&&&&&&&&&&&&&&&#                            
+                            ,@&&&&&&&&&&&&&&&&&&&&&&&&(,                        
+                          %&&&&&&&&&&&&&&&&&&&&&&&&&&&&&(                       
+                        ,&&&&&&&&&&&&&&&&&&&&&&&&&&&&@&&&,                      
+                        &&&&&&&&&&&&&&&&&@&&&&&&&&&&&&&&&&.                     
+                       &&@&&@&&&&&&&&&&&&&@&&&&&&&&&@&&@&&&                     
+                      &&@&&&@&&&&&&&&@&&&&@&&&&@&&@&@&&&&&&&                    
+                      &&@&&@&@&&&&&&&&&&@&@ &&&@&&@&&&&&@&&@                    
+                      @&@&@&%&@&&&&@&&&%@@*@ @@@@@@&@@%&&&&%                    
+                      &&&&&% (% @&&&@/&@@.@,///@&&@&@% #&&&&.                   
+                       &&@&&,%@@@#&,&(,/.    ,.,&&&&@,,@&&&@*                   
+                       &&&@&(#.//(* &          ,&@&&@@&&&&&@@                   
+                       &&&&@@@                 &&&&&@&&&&&&@&                   
+                        &&&@@@@.               @%&&@&&&&&&@@&(                  
+                        (&&@@@@@@     @        @@&&@&&&&&&&&&&                  
+                         @&&@@@@@@@@@.      (. &&&@&@&&&&@&@@&@                 
+                         &&&@@@@@@@@%@@@%#*#***@&&&&@&&&&&&@@&&@                
+                         #&&&@@@@@@@(@@@@#@(%*@&&&&&&&&&&&@@@@&&&#              
+                         (&&&&@@@@@,,@@/ %.,@&,FYQ&&&&&&@&@@@@@&&&&@            
+                         @&&&&@@@@@@/*%@# /@%@@#MISSISSAUGA@@@@@@&&&&@           
+                       ../@,*..   ..*%%% .@%%%&&&ON&CANADA&&,,.,,,,,,@&&          
+                    /(,*//*   ,*    /&%%%%%%%(*/(APR 27, 2021*/,*/**&***((,        
+                    (%,,%.  /%,     /#%&@@,***,**&&&&@&&&&**,***#**(@%#,,       
+                   /,@&,&*,&%,,,.   /%%%%,. .,,*,,(&&&&@&&/*,,**,,&&@&%%.       
+                  .#*/%((&(((//*(/ ./%@% %/      */(&&&@&&@(/////@((%(*%,//     
+                  @@#..@@@.      ...%#&,# .        ,.&&&@&&,..,,&@@@@@@@.....   
+               .(/%///,*/         .#%%@/*  #(//#&%  ,/@&&&&@*//#%@(/%(*,*//,,,  
+                &%&(,,((.          &%%**  #        (##(/&&&&,%*%&%%*,,*&&%,,,%  
+ """
+```
