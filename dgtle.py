@@ -2,254 +2,162 @@ import os
 import time
 import requests
 from bs4 import BeautifulSoup
+from threading import Thread
 
-'''
-Put all webpage url shorcuts into the same folder this py file located.
+"""
+In default, you shall put all the webpage url shortcuts at 
+D:\\RMT\\DGT
+And you can run this py file anywhere.
+
+To change the target path, go to the bottom, and change it as per your need.
 Then use Powershell / Cmd to run py file.
 images will be downloaded as their original resolution and 
 stored into each folder by author's id.
-'''
+"""
 
-# 3/11/2021 
-# 6:59 PM
+# FYQ
+# 4/27/2021
+# 10:04 PM
 
-# Set current py folder as working folder with os package.
-rootdir=os.curdir 
-
-def urltotxt():
-    '''
-    Convert url to text, and save it as a temporary file "load.txt"
-    '''
+# GET WEBPAGE URL FROM SHORTCUT LINKAGES IN CERTAIN FOLDER
+def internet_shortcut(rootdir):
+    webpage_list = []
     for (_,_,filenames) in os.walk(rootdir):
         for filename in filenames:
-            with open(rootdir + '\\'+ filename, "r", encoding='utf-8') as infile:
-                for line in infile:
-                    if (line.startswith('URL')):
-                        url = line[4:]
-                        print(url, end='', file=open(rootdir + '/' + "load.txt", "a"))
-                        break
+            if filename.endswith('.URL'):
+                with open(rootdir + '/'+ filename, "r", encoding='utf-8') as f:
+                    webpage = f.read().split('\n')[1][4:]
+                    if webpage.startswith('http'):
+                        webpage_list.append(webpage)
+    return webpage_list
 
-def txttourl(path):
-    '''
-    Extracting txt of each article from that temporary file "load.txt"
-    :path is current folder where your py file located.
-    :return result
-    '''
-    result=[]
-    with open(path,'r') as f:
-        for line in f:
-            result.append(list(line.strip('\n').split(',')))
-    return result
-
-def dgtsoup(URL, header):
-    '''
-    Use 'BeautifulSoup' & 'lxml' to parsing html
-    :URL & header is the input
-    :return soup.
-    '''
-    response = requests.get(URL, headers=header)
+# USE BEAUTIFULSOUP TO PARSING HTML AND XML DOCUMENTS
+def get_soup_from_webpage(url, header):
+    response = requests.get(url, headers=header)
+    response.encoding = 'utf-8' 
     content = response.text
     soup = BeautifulSoup(content, 'lxml')
     return soup
 
-def dgttitle(soup):
-    '''
-    Use Inst author as dir_name
-    :soup is the input from dgtsoup(url)
-    :return dir_name
-    '''
-    title = soup.title.get_text()
-    return title
+def get_soup_from_localhtml(webpage):
+    soup = BeautifulSoup(open(webpage, encoding='utf-8'), features='lxml')
+    return soup
 
-def dgtinst_author(soup):
-    '''
-    Use Inst author as dir_name
-    :soup is the input from dgtsoup(url)
-    :return dir_name
-    '''
-    author = soup.find_all('div', class_='userinfo-pop-up-name')
-    author_bf = BeautifulSoup(str(author[0]), 'lxml')
-    author_id = author_bf.find_all('span')
-    for n in author_id:
-        dir_name = n.get_text()
-    return dir_name
+# FIND TITLE USING BS4
+def find_title(soup):
+    web_title = soup.title.get_text()
+    return web_title
 
-def dgtinst_img(soup):
-    '''
-    Inst image link add to downlist
-    :soup is the input from dgtsoup(url)
-    :return downlist
-    '''
+# FIND AUTHOR AND USE IT AS FOLDER'S NAME
+def find_author(soup):
+    # This is for Inst page, and if it is not, which will return None
+    if soup.find('div', class_='interset-content-top'): 
+        # In that case, skip this line, goto next condition
+        author = soup.find('div', class_='interset-content-top').get_text().strip().split("\n")[0] 
+    else: # Choose Article page instead.
+        author = soup.find('span', class_='author').get_text()
+    return author
+
+# EXTRACT IMAGE URL USING BS4
+def extract_image_url(soup):
     downlist = []
-    tag_div = soup.find_all('div', class_='bg-img')
-    div_bf = BeautifulSoup(str(tag_div), 'lxml')
-    tag_img = div_bf.find_all('img')
-    for x in tag_img:
-        img_url = x.get('src')
-        img_url = img_url.replace('_1800_500','')
-        downlist.append(img_url)
+    # Some Article has comment section underneath, comes with the referred images from other pages.
+    # and occasionally, visitor can comment with images.
+    # Here the codes used to removed such images.
+    # Try...Except... used here to prevent any potential warning and mistakes.
+    try:
+        soup.find('div', class_="comment-hot-new-warp").decompose()
+    except:
+        pass
+    
+    tags = soup.find_all('img')
+    for n in tags:
+
+        # Article Type
+        if n.get('data-original'):
+            raw_img_url = n.get('data-original')
+        # Inst Type and majority of Article Type
+        elif n['src']:
+            raw_img_url = n.get('src')
+        img_url = raw_img_url.replace('_1800_500','').split("?")[0]
+
+        if 'dgtle_img/article' in img_url or 'dgtle_img/ins' in img_url:
+            downlist.append(img_url)
+    
+    if len(downlist) == 0:
+        print("Nothing found here, it's time to update code.")
+    
+    # Remove duplicated images, just incase.
+    downlist = list(set(downlist))
     return downlist
 
-def dgtartc_author(soup):
-    '''
-    Use article author as dir_name
-    :soup is the input from dgtsoup(url)
-    :return dir_name
-    '''
-    author = soup.find_all('span', class_='author')
-    for n in author:
-        dir_name = n.get_text() 
-    return dir_name
-
-def dgtartc_img(soup):
-    '''
-    Article image link add to downlist
-    :soup is the input from dgtsoup(url)
-    :return downlist
-    '''
-    downlist = []    
-    tag_div = soup.find_all('div', class_='articles-comment-left forum-viewthread-article-box')
-    div_bf = BeautifulSoup(str(tag_div[0]), 'lxml')
-    tag_img = div_bf.find_all('img')
-    for x in tag_img:
-        img_url = x.get('data-original')
-        img_url = img_url.replace('_1800_500','')
-        downlist.append(img_url)
-    return downlist
-
-def dgturl(URL,soup):
-    '''
-    Execute the image analyze.
-    :use URL to initial the start sequnce
-    :return dir_name and downlist
-    '''
-    if 'inst' in URL:
-        dir_name = dgtinst_author(soup)
-        downlist = dgtinst_img(soup)
-    elif 'article' in URL:
-        dir_name = dgtartc_author(soup)
-        downlist = dgtartc_img(soup)
-    else:
-        print('There is no key words in URL, please add new code to fix it.')
-    return dir_name, downlist
-
-def dgttrysoup(URL, header):
-    '''
-    Use BS to findout the author id and use it as dir_name
-    :use URL & header as input
-    :return dir_name and downlist
-    '''
-    attemp_bf = 0
-    success_bf = False
-    while attemp_bf < 10 and not success_bf:
+# DUE TO THE POOR SERVER CONNECTION, IT IS NECESSARY TO KEEP TRYING MULTIPLE TIMES
+def try_soup_ten_times(url, header):
+    soup_attemp = 0
+    success_status = False
+    while soup_attemp < 10 and not success_status:
         try:
-            soup = dgtsoup(URL, header)
-            title = dgttitle(soup)
+            soup = get_soup_from_webpage(url, header)
+            title = find_title(soup)
             print(title)
-            dgturl_result = dgturl(URL, soup)
-            dir_name = dgturl_result[0]
-            downlist = dgturl_result[1]
+            dir_name = find_author(soup)
+            downlist = extract_image_url(soup)
             print(f'Author is: {dir_name}')
             print(f'Found {len(downlist)} Images')
-            success_bf = True
+            success_status = True
         except:
-            attemp_bf += 1
-            print("Links extracting failed..")
-            print("Wait for 5 seconds")
+            soup_attemp += 1
+            print("Seems the network is not very stable...")
+            print("Let's wait for 5 seconds.")
             time.sleep(5)
-            print("Continue...")
-            if attemp_bf == 10:
+            print("Ok, let's try again.")
+            if soup_attemp == 10:
+                print("Well, I guess we just let it go.")
                 break
     return dir_name, downlist
 
+def make_folder_asper_author(dir_name):
+    if not os.path.exists(dir_name): 
+        os.mkdir(dir_name)
 
-def dgtdownload(dir_name, downlist, header):
-    '''
-    Distributing download files with their link
-    :use dir_name, downlist, header as inputs
-    '''
+# THE CORE OF THIS CODE IS DOWNLOAD IMAGE W/O ANY ISSUES.
+def rillaget(url, dir_name):
+    # This is actually the biggest improve. to let one function carried out only one task.
+    # This also makes the multithreading possible.
+    filename = url.split("/")[-1]
+    total_path = dir_name + '/' + filename
+    attempts = 0
+    success = False
+    while attempts < 5 and not success:
+        try:
+            response = requests.get(url)
+            if len(response.content) == int(response.headers['Content-Length']):
+                with open(total_path, 'wb') as fd:
+                    for chunk in response.iter_content(1024):
+                        fd.write(chunk)
+                print(filename + "  Successfully downloaded")
+                success = True
+            else:
+                print("image might not received complete, will try one more time.")
+        except:
+            attempts += 1
+            if attempts == 5:
+                print(filename + 'failed to download.')
+                break
 
-    t1 = time.time() # Start time count
-    filenumber = 0
-    total_number = len(downlist)
-    filenumber = dgtdownloading(filenumber, downlist, dir_name)
-    failnumber = total_number - filenumber
-    t2 = time.time()-t1 # Finish time count
-    print(f'{filenumber} files downloaded, took: {t2:.2f} seconds.')
-    
-    if failnumber > 0:
-        print(f'Warning，There are {failnumber} files failed to be downloaded.')
-    print()
+if __name__ == '__main__':
+    rootdir=r'D:\RMT\DGT'  # <<<< CHANGE HERE TO THE FOLDER YOU PUT THE URL SHORTCUTS
+    header = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0"}
 
-def dgtdownloading(filenumber, downlist, dir_name):
-    '''
-    Monitoring download process
-    :use filenumber, downlist and dir_name as inputs
-    :return filenumber
-    '''
-    while len(downlist)>0:
-        url = downlist.pop() 
-        file_name = url.split("/")[-1]
-        attempts = 0
-        success = False
-        while attempts < 5 and not success:
-            try:
-                t3 = time.time()
-                success = dgtdownloader(url, file_name, dir_name, header) 
-                filenumber += 1
-                t4 = time.time()-t3
-                print(f' {t4:.2f} Seconds used.') 
-            except:
-                print('Retry downloading')
-                attempts += 1
-    return filenumber
-
-def dgtdownloader(url, file_name, dir_name, header):
-    '''
-    Downloader, try my best to download a complete image due to the awful server connection.
-    :use url, file_name, dir_name, header as inputs
-    :return success status
-    '''
-    response = requests.get(url, headers=header, verify=False, timeout=30)
-    if response.status_code == 200 and not os.path.exists(dir_name): 
-        os.mkdir(dir_name)        
-    total_path = dir_name + '/' + file_name
-    
-    if 'Content-Length' in response.headers and len(response.content) == int(response.headers['Content-Length']):
-        with open(total_path, 'wb') as f:
-            for chunk in response.iter_content(1024):
-                f.write(chunk)
-            f.close()
-        print(file_name + " successfully downloaded.")
-        success = True
-
-    else:
-        print(file_name + "may downloaded incomplete.")
-
-    return success
-
-def dgtplay(URL, header):
-    '''
-    Start the whole sequence.
-    :use URL, header as inputs
-    :no return
-    '''
-    soup = dgttrysoup(URL, header)
-    dir_name = soup[0]
-    downlist = soup[1]
-    dgtdownload(dir_name, downlist, header)
-
-
-if __name__ == '__main__':    
-    path = 'load.txt'
-    urltotxt()
-    result = txttourl(path)
-    header = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:81.0) Gecko/20100101 Firefox/81.0'}
-    for x in result:
-        URL = x[0]
-        print('The web that open: ' + URL)
-        dgtplay(URL, header)
-        
-# Delete the temporary load.txt from current folder.
-    if os.path.exists('load.txt'):
-        os.remove('load.txt')
+    webpage_list = internet_shortcut(rootdir)
+    for URL in webpage_list:
+        dir_name, downlist = try_soup_ten_times(URL, header)
+        make_folder_asper_author(dir_name)
+        threads = []
+        for url in downlist:
+            t = Thread(target = rillaget, args = [url, dir_name])
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
