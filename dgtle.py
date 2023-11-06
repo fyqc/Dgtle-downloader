@@ -12,8 +12,8 @@ images will be downloaded as their original resolution and
 stored into each folder by author's id.
 """
 
-# 7/16/2021
-# 2:16 PM
+# 11/6/2023
+# 2:46 AM
 
 
 def internet_shortcut(rootdir=os.getcwd()):
@@ -111,6 +111,11 @@ def try_soup_ten_times(url, header):
             soup = get_soup_from_webpage(url, header)
             title = find_title(soup)
             print(title)
+            if title == " 数字尾巴 分享美好数字生活":
+                print("This post might be deleted.")
+            if "无法找到内容" in soup.get_text() or "内容已删除或正在审核" in soup.get_text():
+                print("Well, let it go.")
+                return ("404","404")
             dir_name = find_author(soup)
             downlist = extract_image_url(soup)
             print(f'Author is: {dir_name}')
@@ -124,7 +129,7 @@ def try_soup_ten_times(url, header):
             print("Ok, let's try again.")
             if soup_attemp == 10:
                 print("Well, let it go.")
-                break
+                return ("404","404")
     return dir_name, downlist
 
 
@@ -168,6 +173,8 @@ if __name__ == '__main__':
     webpage_list = internet_shortcut()
     for weblink in webpage_list:
         dir_name, downlist = try_soup_ten_times(weblink, header)
+        if downlist == "404":
+            continue
         make_folder_asper_author(dir_name)
         threads = []
         for link in downlist:
