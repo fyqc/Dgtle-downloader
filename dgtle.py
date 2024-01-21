@@ -12,8 +12,8 @@ images will be downloaded as their original resolution and
 stored into each folder by author's id.
 """
 
-# 11/6/2023
-# 2:46 AM
+# 1/20/2024
+# 11:09 PM
 
 
 def internet_shortcut(rootdir=os.getcwd()):
@@ -24,7 +24,7 @@ def internet_shortcut(rootdir=os.getcwd()):
     for (_, _, filenames) in os.walk(rootdir):
         for filename in filenames:
             if filename.endswith('.URL'):
-                with open(rootdir + '/' + filename, "r", encoding='utf-8') as f:
+                with open(os.path.join(rootdir, filename), "r", encoding='utf-8') as f:
                     webpage = f.read().split('\n')[1][4:]
                     # Just be sure the data we acquired is URL.
                     if webpage.startswith('http'):
@@ -143,9 +143,12 @@ def rillaget(link, dir_name, header):
     THE CORE OF THIS CODE IS DOWNLOAD IMAGE W/O ANY ISSUES.
     '''
     filename = link.split("/")[-1]
-    if filename[-11:] == "_1800_500_w":
-        filename = "".join([filename, '.jpg'])
-    total_path = dir_name + '/' + filename
+    
+    # On January 20, 2024, it was discovered that some pictures did not have suffixes, but were actually in jpeg format.
+    # http://s1.dgtle.com/dgtle_img/article/2024/01/01/2e6b7202401012057028574_1800_500_w.Zuiko PRO」开向山的大门
+    if '.' not in filename[-6:]:
+        filename = "".join([filename, '.jpeg'])
+    total_path = os.path.join(dir_name, filename)
     attempts = 0
     success = False
     while attempts < 5 and not success:
