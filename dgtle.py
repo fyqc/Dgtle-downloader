@@ -12,8 +12,8 @@ images will be downloaded as their original resolution and
 stored into each folder by author's id.
 """
 
-# 1/20/2024
-# 11:09 PM
+# 4/4/2024
+# 12:49 PM
 
 
 def internet_shortcut(rootdir=os.getcwd()):
@@ -146,8 +146,13 @@ def rillaget(link, dir_name, header):
     
     # On January 20, 2024, it was discovered that some pictures did not have suffixes, but were actually in jpeg format.
     # http://s1.dgtle.com/dgtle_img/article/2024/01/01/2e6b7202401012057028574_1800_500_w.Zuiko PRO」开向山的大门
-    if '.' not in filename[-6:]:
+    # On April 04, 2024, it was discovered that some pictures did not have suffixes, but were actually in jpeg format.
+    # d7e06202403251246431344_1800_500_w.313
+    
+    extentions = ['.jpg', '.png', '.jpeg', '.gif']
+    if not any(ext in filename for ext in extentions):
         filename = "".join([filename, '.jpeg'])
+        
     total_path = os.path.join(dir_name, filename)
     attempts = 0
     success = False
