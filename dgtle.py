@@ -2,7 +2,6 @@ import os
 import time
 import requests
 from bs4 import BeautifulSoup
-from threading import Thread
 from concurrent.futures import ThreadPoolExecutor, wait
 import logging
 
