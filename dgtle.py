@@ -28,7 +28,6 @@ THREAD_POOL_SIZE = 8
 # Logging setup
 def setup_logging():
     # Create the logger
-    logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
     # Create handlers
@@ -254,7 +253,7 @@ def main():
 
 
 if __name__ == '__main__':
-    setup_logging()
     logger = logging.getLogger()
+    setup_logging()
     header = {"User-Agent": USER_AGENT}
     main()
