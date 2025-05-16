@@ -1,9 +1,11 @@
-import os
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from tqdm import tqdm
+from typing import Tuple
+import logging
 import time
 import requests
-from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor, wait
-import logging
 
 
 """
@@ -14,76 +16,75 @@ images will be downloaded as their original resolution and
 stored into each folder by author's id.
 """
 
-# 12/31/2024
-# 6:49 PM
+# 5/16/2025
+# 12:33 PM
+
+HEADER = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0'}
 
 
-# Configuration
-LOGFILE_PATH = os.path.join(os.getcwd(), "dgtle.log")
-USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:88.0) Gecko/20100101 Firefox/88.0"
-MAX_RETRIES = 10
-THREAD_POOL_SIZE = 8
+def setup_logging() -> None:
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        level=logging.INFO,
+        handlers=[logging.FileHandler(filename="dgtle.log", mode="a", encoding="utf-8")])
 
 
-# Logging setup
-def setup_logging():
-    # Create the logger
-    logger.setLevel(logging.INFO)
-
-    # Create handlers
-    file_handler = logging.FileHandler(
-        filename=LOGFILE_PATH, mode="a", encoding="utf-8")
-    console_handler = logging.StreamHandler()
-
-    # Define separate formats
-    file_format = logging.Formatter(
-        "%(asctime)s %(levelname)s %(lineno)d %(message)s")
-    console_format = logging.Formatter("%(message)s")
-
-    # Set formats to handlers
-    file_handler.setFormatter(file_format)
-    console_handler.setFormatter(console_format)
-
-    # Add handlers to the logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-    # Add a utility function to the logger for inserting empty lines
-    def insert_empty_line():
-        file_handler.stream.write("\n")
-        file_handler.flush()  # Ensure the newline is immediately written to the file
-
-    # Attach the utility to the logger
-    logger.insert_empty_line = insert_empty_line
-
-
-# Get webpage URLs from shortcuts
-def internet_shortcut(rootdir=os.getcwd()):
+def internet_shortcut() -> list:
     '''
-    GET WEBPAGE URL FROM SHORTCUT LINKAGES IN CERTAIN FOLDER.
+    Get the "webpage URL" from the shortcut link in the current folder
+    Return a dictionary of "URL" and "file name"
     '''
+    rootdir = Path.cwd()  # Get the current working directory as a Path object
     webpage_list = {}
-    for _, _, filenames in os.walk(rootdir):
-        for filename in filenames:
-            if filename.lower().endswith('.url'):
-                try:
-                    with open(os.path.join(rootdir, filename), "r", encoding='utf-8') as f:
-                        webpage = f.read().split('\n')[1][4:]
-                        # Just be sure the data we acquired is URL
-                        if webpage.startswith('http'):
-                            webpage_list[webpage] = filename
-                except Exception as e:
-                    logger.warning(f"Error reading shortcut {filename}: {e}")
+
+    # Recursively find all .url files
+    for filename in rootdir.glob("**/*.url"):
+        try:
+            with Path(filename).open(mode='r', encoding='utf-8') as f:
+                webpage = f.read().split('\n')[1][4:]
+                if webpage.startswith('http'):
+                    webpage_list[webpage] = filename
+        except Exception as e:
+            logging.warning(f"Error reading shortcut {filename}: {e}")
+            print(f"Error reading shortcut {filename}: {e}")
+
     return webpage_list
 
 
-# Used for test and troubleshooting
-def get_soup_from_localhtml(webpage):
-    soup = BeautifulSoup(open(webpage, encoding='utf-8'), features='lxml')
-    return soup
+def get_soup_from_webpage(url: str, header: dict, retries: int = 5) -> BeautifulSoup:
+    '''
+    Use BEAUTIFULSOUP to parse HTML documents
+    Generate "soup"
+    Due to poor server connection, multiple attempts are required
+    '''
+    for attempt in range(retries):
+        try:
+            if attempt == 0:
+                logging.info(url)
+                print(url)
+
+            response = requests.get(url, headers=header, timeout=35)
+            response.encoding = "utf-8"
+
+            return BeautifulSoup(response.text, "lxml")
+
+        except requests.RequestException as e:
+            logging.warning(f" {url} failed {attempt + 1}th time: \n{e}")
+            print(f" {url} failed {attempt + 1}th time")
+
+            logging.info("Wait 5 seconds")
+            print("Wait 5 seconds")
+
+            time.sleep(5)
+
+    logging.error(f"Could not fetch {url} after {retries} attempts")
+    print(f"Could not fetch {url} after {retries} attempts")
+
+    return None
 
 
-def find_author(soup):
+def find_author(soup: BeautifulSoup) -> str:
     '''
     FIND AUTHOR AND USE IT AS FOLDER'S NAME.
     '''
@@ -97,7 +98,7 @@ def find_author(soup):
     return author
 
 
-def extract_image_url(soup):
+def extract_image_url(soup: BeautifulSoup) -> list:
     '''
     EXTRACT IMAGE URL USING BS4.
     '''
@@ -128,132 +129,128 @@ def extract_image_url(soup):
                     downlist.add(img_url)
 
     except Exception as e:
-        logger.warning(f"Error extracting images: {e}")
-
-    if not downlist:
-        logger.warning(
-            "Nothing found, maybe they changed the code again. Let's upgrade the code too.")
+        logging.warning(f"Error extracting images: {e}")
+        print(f"Error extracting images: {e}")
 
     return list(downlist)
 
 
-# Fetch and parse webpage
-def get_soup_from_webpage(url, header, retries):
+def rillaget(link: str, dir_name: str, header: dict) -> Tuple[bool, str]:
     '''
-    USE BEAUTIFULSOUP TO PARSING HTML AND XML DOCUMENTS.
-    DUE TO THE POOR SERVER CONNECTION, IT IS NECESSARY TO KEEP TRYING MULTIPLE TIMES.
+    A naive but slightly better self-made downloader
     '''
-    for attempt in range(retries):
+    attempts = 0
+    success = False
+    while attempts < 8 and not success:
         try:
-            response = requests.get(url, headers=header, timeout=15)
-            response.encoding = "utf-8"
-            return BeautifulSoup(response.text, "lxml")
-        except requests.RequestException as e:
-            logger.warning(f"Attempt {attempt + 1} failed for {url}: {e}")
-            logger.info("Let's wait for 5 seconds.")
-            time.sleep(5)
-            logger.info("Let's back to work.")
-    logger.critical(f"Failed to fetch {url} after {retries} attempts.")
-    return None
+            response = requests.get(link, headers=header, timeout=(10, 60))
+            response.raise_for_status()
 
+            filename = link.split("/")[-1]
 
-def rillaget(link, dir_name, header, retries=8):
-    filename = link.split("/")[-1]
-    if ".image" in filename:  # toutiaoimg.com
-        filename = filename.split(".")[0]
+            if ".image" in filename:  # toutiaoimg.com
+                filename = filename.split(".")[0]
 
-    for attempt in range(retries):
-        try:
-            response = requests.get(link, headers=header, timeout=10)
-
-            if response.status_code == 200:
-                # Get content type and set proper extension
+            extensions = ['.jpg', '.png', '.jpeg', '.gif', '.webp']
+            if not any(filename.endswith(ext) for ext in extensions):
                 content_type = response.headers.get('Content-Type', '')
-                extentions = ['.jpg', '.png', '.jpeg', '.gif', '.webp']
-                if not any(ext in filename.lower() for ext in extentions):
+                if '/' in content_type:
                     image_format = content_type.split('/')[-1]
                     filename = f"{filename}.{image_format}"
 
-                total_path = os.path.join(dir_name, filename)
-                expected_length = int(
-                    response.headers.get('Content-Length', 0))
-                current_length = 0
+            total_path = Path(dir_name) / filename
 
-                with open(total_path, 'wb') as f:
-                    # Increased chunk size for better performance
-                    for chunk in response.iter_content(8192):
-                        f.write(chunk)
-                        current_length += len(chunk)
+            with open(total_path, 'wb') as f:
+                f.write(response.content)
 
-                # Verify file size after download
-                if expected_length > 0 and current_length >= expected_length:
-                    logger.info(f"{filename}  Downloaded.")
-                    return True
+            return True, total_path
 
-            elif response.status_code == 403:
-                logger.warning(f"Access forbidden (403) for {filename}")
-                time.sleep(5)
-                continue
+        except requests.exceptions.HTTPError as e:
+            wait_time = 5 * attempts + 5
+            logging.error(
+                f'Network error occurred while trying to download {link}, waiting {wait_time} seconds before making {attempts + 1}th attempt')
+            time.sleep(wait_time)
+            attempts += 3
 
-            # Other status codes
-            logger.warning(
-                f'Network error {response.status_code} occurred while trying to download {link}, waiting {5 * (attempt + 1)} seconds before making {attempt + 1}th attempt')
-            time.sleep(5 * (attempt + 1))
+        except Exception as e:
+            wait_time = 5 * attempts + 5
+            logging.error(
+                f'Network error occurred while trying to download {link}, waiting {wait_time} seconds before making {attempts + 1}th attempt')
+            time.sleep(wait_time)
+            attempts += 1
 
-        except requests.RequestException as e:
-            logger.error(
-                f'Network error {response.status_code} occurred while trying to download {link}, waiting {5 * (attempt + 1)} seconds before making {attempt + 1}th attempt')
-            time.sleep(5 * (attempt + 1))
-
-    # If all retries failed
-    logger.error(f"{filename} Failed to download.")
-    return False
+    if attempts == 8:
+        return False, str(e)
 
 
-def main():
-    webpage_list = internet_shortcut()
-    with ThreadPoolExecutor(max_workers=THREAD_POOL_SIZE) as executor:
-        for weblink, shortcut in webpage_list.items():
+def download_all(downlist, dir_name, header, max_workers=16):
+    Path(dir_name).mkdir(parents=True, exist_ok=True)
 
-            logger.info(weblink)
-            logger.info(shortcut)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
 
-            soup = get_soup_from_webpage(weblink, header, retries=MAX_RETRIES)
-            title = soup.title.get_text()
-            logger.info(f"\n{title}")
+        futures = [executor.submit(rillaget, link, dir_name, header)
+                   for link in downlist]
 
-            if title == " 数字尾巴 分享美好数字生活":
-                logger.critical("The post was probably harmonized.")
-                continue
+        for link, future in tqdm(zip(downlist, futures), total=len(downlist), desc="Downloading"):
 
-            if "无法找到内容" in soup.get_text() or "内容已删除或正在审核" in soup.get_text():
-                logger.critical(
-                    "The content cannot be found or has been deleted or is under review. Sorry, next one!")
-                continue
+            try:
+                success, result = future.result()
 
-            dir_name = find_author(soup)
-            downlist = extract_image_url(soup)
+                logging.info(
+                    f"{link} {'Download successful' if success else 'Download failed'} -> {result}")
 
-            logger.info(f'Author is: {dir_name}')
-            logger.info(f'Found {len(downlist)} Images')
-
-            if not downlist:
-                logger.critical("downlist is not existing.")
-                continue
-
-            os.makedirs(dir_name, exist_ok=True)
-
-            # Submit all downloads for this webpage and wait for them to complete
-            futures = [executor.submit(
-                rillaget, link, dir_name, header) for link in downlist]
-            # Wait for all downloads from this webpage to complete
-            wait(futures)
-
-            logger.insert_empty_line()
+            except Exception as e:
+                logging.error(f"Error {link}: {e}")
+                print(f"Error {link}: {e}")
 
 
 if __name__ == '__main__':
-    logger = logging.getLogger()
     setup_logging()
-    header = {"User-Agent": USER_AGENT}
-    main()
+
+    webpage_list = internet_shortcut()
+    for webpage, shortcut in webpage_list.items():
+        logging.info(shortcut)
+
+        soup = get_soup_from_webpage(webpage, HEADER)
+
+        if not soup:
+            logging.critical("Failed to get soup, please check the code")
+            print("Failed to get soup, please check the code")
+            continue
+
+        title = soup.title.get_text()
+        logging.info(f"\n{title.lstrip()}")
+        print(f"\n{title.lstrip()}")
+
+        if title == " 数字尾巴 分享美好数字生活":
+            logging.critical(
+                "The post was probably deleted due to content review.")
+            print("The post was probably deleted due to content review.")
+            continue
+
+        if "无法找到内容" in soup.get_text() or "内容已删除或正在审核" in soup.get_text():
+            logging.critical(
+                "The content cannot be found or has been deleted or is under review. Sorry, next one!")
+            print(
+                "The content cannot be found or has been deleted or is under review. Sorry, next one!")
+            continue
+
+        dir_name = find_author(soup)
+        downlist = extract_image_url(soup)
+
+        logging.info(f'Author is: {dir_name}')
+        print(f'Author is: {dir_name}')
+
+        logging.info(f'Found {len(downlist)} images')
+        print(f'Found {len(downlist)} images')
+
+        if not downlist:
+            logging.critical(
+                "Nothing found, maybe they changed the code again.")
+            print("Nothing found, maybe they changed the code again.")
+
+        download_all(downlist, dir_name, HEADER)
+
+        # Add blank lines to separate log and print output
+        logging.info('\n' * 3)
+        print('\n' * 2)
