@@ -1,11 +1,12 @@
-from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from tqdm import tqdm
-from typing import Tuple
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Tuple
+
 import requests
+from bs4 import BeautifulSoup
+from tqdm import tqdm
 
 
 """
